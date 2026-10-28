@@ -59,8 +59,24 @@ h3{font-size:13px;color:var(--muted);margin:16px 0 4px}
 <label>Password (at least 6 characters)<input id="password" type="password" autocomplete="current-password" minlength="6" required></label>
 <button type="submit" id="loginBtn">Log in</button>
 <button type="button" class="outline" id="signupBtn">Create account</button>
+<button type="button" class="ghost" id="forgotBtn">Forgot password?</button>
 </form>
 <div class="msg" id="authMsg"></div>
+</div>
+</div>
+</div>
+
+<!-- NEW PASSWORD VIEW -->
+<div id="resetView" class="hidden">
+<div class="auth">
+<h1>📈 Trading Journal</h1>
+<div class="card">
+<h2>Choose a new password</h2>
+<form id="resetForm">
+<label>New password (at least 6 characters)<input id="newpass" type="password" autocomplete="new-password" minlength="6" required></label>
+<button type="submit">Save new password</button>
+</form>
+<div class="msg" id="resetMsg"></div>
 </div>
 </div>
 </div>
@@ -119,10 +135,29 @@ let trades=[];
 let currentUser=null;
 
 /* ---------- Auth ---------- */
+let recovering=false;
 function show(view){
   $("authView").classList.toggle("hidden",view!=="auth");
   $("appView").classList.toggle("hidden",view!=="app");
+  $("resetView").classList.toggle("hidden",view!=="reset");
 }
+$("forgotBtn").addEventListener("click",async()=>{
+  const email=$("email").value.trim();
+  if(!email){authMsg("Type your email above first, then tap Forgot password.",true);return}
+  authMsg("Sending reset email…");
+  const {error}=await sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname});
+  if(error)authMsg(error.message,true);
+  else authMsg("If that email has an account, a reset link is on its way. Check your spam folder too.");
+});
+$("resetForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const m=$("resetMsg");m.textContent="Saving…";m.style.color="var(--muted)";
+  const {error}=await sb.auth.updateUser({password:$("newpass").value});
+  if(error){m.textContent=error.message;m.style.color="var(--neg)";return}
+  recovering=false;$("newpass").value="";
+  const {data}=await sb.auth.getSession();
+  currentUser=null;onSession(data.session);
+});
 function authMsg(text,bad){const m=$("authMsg");m.textContent=text;m.style.color=bad?"var(--neg)":"var(--muted)"}
 
 $("authForm").addEventListener("submit",async e=>{
@@ -142,6 +177,7 @@ $("signupBtn").addEventListener("click",async()=>{
 $("logout").addEventListener("click",async()=>{await sb.auth.signOut()});
 
 function onSession(session){
+  if(recovering){show("reset");return}
   if(session&&session.user){
     if(currentUser&&currentUser.id===session.user.id)return;
     currentUser=session.user;
@@ -155,7 +191,10 @@ function onSession(session){
     $("password").value="";
   }
 }
-sb.auth.onAuthStateChange((event,session)=>{setTimeout(()=>onSession(session),0)});
+sb.auth.onAuthStateChange((event,session)=>{
+  if(event==="PASSWORD_RECOVERY")recovering=true;
+  setTimeout(()=>onSession(session),0);
+});
 sb.auth.getSession().then(({data})=>onSession(data.session));
 
 /* ---------- Data ---------- */
