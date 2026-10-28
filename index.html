@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Trading Journal</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--text:#14181f;--muted:#6b7280;--line:#e5e7eb;--pos:#0f9d58;--neg:#d93025;--accent:#2563eb;color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root{--bg:#0f1115;--card:#1a1d24;--text:#eceef2;--muted:#9aa1ad;--line:#2a2f39;--pos:#34c27a;--neg:#f2675c;--accent:#6c9cff;color-scheme:dark}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:640px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:4px 0 14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin-bottom:14px}
+.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+.stat small{color:var(--muted);display:block;font-size:12px}
+.stat b{font-size:20px}
+.pos{color:var(--pos)}.neg{color:var(--neg)}
+form{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+label{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:4px}
+.full{grid-column:1/-1}
+input,select,textarea{font:inherit;padding:10px;border-radius:10px;border:1px solid var(--line);background:var(--bg);color:var(--text);width:100%}
+button{font:inherit;border:0;border-radius:10px;padding:12px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
+button.ghost{background:transparent;color:var(--muted);padding:4px 8px;font-weight:400}
+button.outline{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.trade{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.trade:first-child{border-top:0}
+.trade .meta{color:var(--muted);font-size:12px}
+.trade .note{font-size:13px;margin-top:2px}
+.right{text-align:right;white-space:nowrap}
+.empty{color:var(--muted);text-align:center;padding:12px}
+h2{font-size:15px;margin:0 0 10px}
+.bar{height:8px;border-radius:4px;background:var(--neg);overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--pos)}
+.row{display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+.row small{color:var(--muted);display:block;font-size:12px}
+h3{font-size:13px;color:var(--muted);margin:16px 0 4px}
+.ins{padding:9px 11px;border-radius:10px;background:var(--bg);margin-bottom:6px;font-size:14px}
+.top{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
+.top h1{margin:0}
+.who{color:var(--muted);font-size:12px;text-align:right}
+.msg{font-size:13px;margin-top:10px;min-height:18px}
+.auth{max-width:380px;margin:8vh auto 0}
+.auth form{grid-template-columns:1fr}
+.hidden{display:none}
+</style>
+</head>
+<body>
+<main>
+
+<!-- LOGIN VIEW -->
+<div id="authView" class="hidden">
+<div class="auth">
+<h1>📈 Trading Journal</h1>
+<div class="card">
+<h2>Log in or create an account</h2>
+<form id="authForm">
+<label>Email<input id="email" type="email" autocomplete="email" required></label>
+<label>Password (at least 6 characters)<input id="password" type="password" autocomplete="current-password" minlength="6" required></label>
+<button type="submit" id="loginBtn">Log in</button>
+<button type="button" class="outline" id="signupBtn">Create account</button>
+</form>
+<div class="msg" id="authMsg"></div>
+</div>
+</div>
+</div>
+
+<!-- APP VIEW -->
+<div id="appView" class="hidden">
+<div class="top">
+<h1>📈 Trading Journal</h1>
+<div class="who"><span id="who"></span><br><button class="ghost" id="logout" type="button">Log out</button></div>
+</div>
+<div id="sync" style="color:var(--muted);font-size:12px;margin:-4px 0 12px"></div>
+
+<div class="card stats" id="stats"></div>
+
+<div class="card"><h2>Analysis</h2><div id="analysis"></div></div>
+
+<div class="card">
+<h2>Log a trade</h2>
+<form id="f">
+<label>Date<input type="date" id="date" required></label>
+<label>Symbol<input id="sym" placeholder="AAPL" required autocapitalize="characters"></label>
+<label>Side<select id="side"><option>Long</option><option>Short</option></select></label>
+<label>Size (units)<input id="size" type="number" step="any" min="0" required></label>
+<label>Entry price<input id="entry" type="number" step="any" required></label>
+<label>Exit price<input id="exit" type="number" step="any" required></label>
+<label>Fees (optional)<input id="fees" type="number" step="any" min="0" value="0"></label>
+<label>Setup / strategy<input id="setup" placeholder="Breakout"></label>
+<label class="full">Notes / lessons<textarea id="notes" rows="2" placeholder="What went right or wrong?"></textarea></label>
+<button class="full" type="submit">Add trade</button>
+</form>
+</div>
+
+<div class="card">
+<h2>Trades</h2>
+<div id="list"></div>
+</div>
+
+<div class="card">
+<h2>Import / Export</h2>
+<p style="color:var(--muted);font-size:13px;margin:0 0 10px">Moving from the old phone journal? Open it, tap Export, copy the text, paste it here and tap Import. You can also export your trades from here as a backup.</p>
+<textarea id="bk" rows="4" placeholder="Backup text goes here"></textarea>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px"><button id="ex" type="button">Export</button><button id="im" type="button">Import</button></div>
+<div id="bkmsg" style="color:var(--muted);font-size:13px;margin-top:8px"></div>
+</div>
+</div>
+
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+const SUPABASE_URL="https://owffwyoweonqctmqqsip.supabase.co";
+const SUPABASE_KEY="sb_publishable_3vzccxI0Lk58oPOYwW-jXA_QwbQMgK2";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+const $=id=>document.getElementById(id);
+let trades=[];
+let currentUser=null;
+
+/* ---------- Auth ---------- */
+function show(view){
+  $("authView").classList.toggle("hidden",view!=="auth");
+  $("appView").classList.toggle("hidden",view!=="app");
+}
+function authMsg(text,bad){const m=$("authMsg");m.textContent=text;m.style.color=bad?"var(--neg)":"var(--muted)"}
+
+$("authForm").addEventListener("submit",async e=>{
+  e.preventDefault();
+  authMsg("Logging in…");
+  const {error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+  if(error)authMsg(error.message,true);
+});
+$("signupBtn").addEventListener("click",async()=>{
+  const email=$("email").value.trim(),password=$("password").value;
+  if(!email||password.length<6){authMsg("Enter your email and a password of at least 6 characters.",true);return}
+  authMsg("Creating account…");
+  const {data,error}=await sb.auth.signUp({email,password});
+  if(error){authMsg(error.message,true);return}
+  if(!data.session)authMsg("Account created. Check your email and click the confirmation link, then log in.");
+});
+$("logout").addEventListener("click",async()=>{await sb.auth.signOut()});
+
+function onSession(session){
+  if(session&&session.user){
+    if(currentUser&&currentUser.id===session.user.id)return;
+    currentUser=session.user;
+    $("who").textContent=currentUser.email;
+    $("date").valueAsDate=new Date();
+    show("app");
+    loadTrades();
+  }else{
+    currentUser=null;trades=[];
+    show("auth");
+    $("password").value="";
+  }
+}
+sb.auth.onAuthStateChange((event,session)=>{setTimeout(()=>onSession(session),0)});
+sb.auth.getSession().then(({data})=>onSession(data.session));
+
+/* ---------- Data ---------- */
+function rowToTrade(r){
+  return {id:r.id,date:r.trade_date,sym:r.symbol,side:r.direction,size:+r.size,entry:+r.entry_price,exit:+r.exit_price,fees:+r.fees||0,setup:r.setup||"",notes:r.notes||"",created:Date.parse(r.created_at)||0};
+}
+function setSync(m,bad){const e=$("sync");e.textContent=m;e.style.color=bad?"var(--neg)":"var(--muted)"}
+async function loadTrades(){
+  setSync("Loading your trades…");
+  const {data,error}=await sb.from("trades").select("*").order("created_at",{ascending:true});
+  if(error){setSync("Could not load trades: "+error.message,true);return}
+  trades=data.map(rowToTrade);
+  setSync("☁️ Saved to your account");
+  render();
+}
+
+/* ---------- Calculations ---------- */
+const fmt=n=>(n<0?"-":"")+"$"+Math.abs(n).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const cls=n=>n>0?"pos":n<0?"neg":"";
+function pnl(t){const d=t.side==="Long"?t.exit-t.entry:t.entry-t.exit;return d*t.size-t.fees}
+function esc(s){return String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]))}
+
+function render(){
+  const p=trades.map(pnl),total=p.reduce((a,b)=>a+b,0);
+  const w=p.filter(x=>x>0),l=p.filter(x=>x<0);
+  const gw=w.reduce((a,b)=>a+b,0),gl=Math.abs(l.reduce((a,b)=>a+b,0));
+  const wr=p.length?w.length/p.length*100:0;
+  const pf=gl?gw/gl:(gw?"∞":"–");
+  const best=p.length?Math.max(...p):0,worst=p.length?Math.min(...p):0;
+  $("stats").innerHTML=`
+  <div class="stat"><small>Total P&amp;L</small><b class="${cls(total)}">${fmt(total)}</b></div>
+  <div class="stat"><small>Win rate (${w.length}W / ${l.length}L)</small><b>${wr.toFixed(0)}%</b><div class="bar"><i style="width:${wr}%"></i></div></div>
+  <div class="stat"><small>Avg win / Avg loss</small><b><span class="pos">${fmt(w.length?gw/w.length:0)}</span> / <span class="neg">${fmt(l.length?-gl/l.length:0)}</span></b></div>
+  <div class="stat"><small>Profit factor</small><b>${typeof pf==="number"?pf.toFixed(2):pf}</b></div>
+  <div class="stat"><small>Best trade</small><b class="${cls(best)}">${fmt(best)}</b></div>
+  <div class="stat"><small>Worst trade</small><b class="${cls(worst)}">${fmt(worst)}</b></div>`;
+  const sorted=[...trades].sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
+  $("list").innerHTML=sorted.length?sorted.map(t=>{const x=pnl(t);return `<div class="trade"><div><b>${esc(t.sym)}</b> · ${t.side}<div class="meta">${t.date} · ${t.size} @ ${t.entry} → ${t.exit}${t.setup?" · "+esc(t.setup):""}</div>${t.notes?`<div class="note">${esc(t.notes)}</div>`:""}</div><div class="right"><b class="${cls(x)}">${fmt(x)}</b><br><button class="ghost" data-id="${t.id}">Delete</button></div></div>`}).join(""):'<div class="empty">No trades yet. Log your first one above.</div>';
+  analysis();
+}
+
+function analysis(){
+  const el=$("analysis");
+  if(trades.length<2){el.innerHTML='<div class="empty">Log at least 2 trades to see your analysis.</div>';return}
+  const s=[...trades].sort((a,b)=>a.date.localeCompare(b.date)||a.created-b.created);
+  let c=0;const pts=s.map(t=>c+=pnl(t));
+  const W=300,H=90,mn=Math.min(0,...pts),mx=Math.max(0,...pts),r0=(mx-mn)||1;
+  const X=i=>pts.length>1?i/(pts.length-1)*W:0,Y=v=>H-(v-mn)/r0*H;
+  const path=pts.map((v,i)=>(i?"L":"M")+X(i).toFixed(1)+","+Y(v).toFixed(1)).join(" ");
+  const col=c>=0?"var(--pos)":"var(--neg)";
+  const svg=`<h3 style="margin-top:0">Equity curve</h3><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;overflow:visible"><line x1="0" x2="${W}" y1="${Y(0)}" y2="${Y(0)}" stroke="var(--line)" stroke-dasharray="3"/><path d="${path}" fill="none" stroke="${col}" stroke-width="2"/></svg>`;
+  const days=["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+  const dims=[["Setup",t=>t.setup||"No setup"],["Symbol",t=>t.sym],["Side",t=>t.side],["Day",t=>days[new Date(t.date+"T00:00").getDay()]]];
+  const all=[];
+  const tables=dims.map(([n,fn])=>{
+    const g={};trades.forEach(t=>{const k=fn(t);(g[k]=g[k]||[]).push(pnl(t))});
+    const rows=Object.entries(g).map(([k,a])=>({dim:n,k,n:a.length,sum:a.reduce((x,y)=>x+y,0),wr:a.filter(x=>x>0).length/a.length*100}));
+    rows.sort((a,b)=>b.sum-a.sum);rows.forEach(r=>all.push(r));
+    return `<h3>By ${n.toLowerCase()}</h3>`+rows.map(r=>`<div class="row"><span>${esc(r.k)}<small>${r.n} trade${r.n>1?"s":""} · ${r.wr.toFixed(0)}% win rate</small></span><b class="${cls(r.sum)}">${fmt(r.sum)}</b></div>`).join("");
+  }).join("");
+  const ins=[];
+  const ok=all.filter(r=>r.n>=2);
+  if(ok.length){
+    const b=ok.reduce((a,r)=>r.sum>a.sum?r:a),w=ok.reduce((a,r)=>r.sum<a.sum?r:a);
+    if(b.sum>0)ins.push(`✅ Strongest edge: ${b.dim.toLowerCase()} “${esc(b.k)}” (${fmt(b.sum)} over ${b.n} trades)`);
+    if(w.sum<0)ins.push(`⚠️ Biggest leak: ${w.dim.toLowerCase()} “${esc(w.k)}” (${fmt(w.sum)} over ${w.n} trades)`);
+  }
+  let run=0,maxL=0;s.forEach(t=>{if(pnl(t)<0){run++;maxL=Math.max(maxL,run)}else run=0});
+  if(maxL>=2)ins.push(`📉 Longest losing streak: ${maxL} trades`);
+  if(!ins.length)ins.push("Keep logging. Insights appear once a group has 2 or more trades.");
+  el.innerHTML=ins.map(x=>`<div class="ins">${x}</div>`).join("")+svg+tables;
+}
+
+/* ---------- Add / delete ---------- */
+$("f").addEventListener("submit",async e=>{
+  e.preventDefault();
+  const t={date:$("date").value,sym:$("sym").value.trim().toUpperCase(),side:$("side").value,size:+$("size").value,entry:+$("entry").value,exit:+$("exit").value,fees:+$("fees").value||0,setup:$("setup").value.trim(),notes:$("notes").value.trim()};
+  setSync("Saving…");
+  const {data,error}=await sb.from("trades").insert({trade_date:t.date,symbol:t.sym,direction:t.side,size:t.size,entry_price:t.entry,exit_price:t.exit,fees:t.fees,setup:t.setup,notes:t.notes,pnl:pnl(t)}).select().single();
+  if(error){setSync("Could not save: "+error.message,true);return}
+  trades.push(rowToTrade(data));
+  setSync("☁️ Saved to your account");
+  render();
+  ["sym","size","entry","exit","setup","notes"].forEach(i=>$(i).value="");$("fees").value=0;
+});
+
+let pend=null;
+$("list").addEventListener("click",async e=>{
+  const id=e.target.dataset.id;if(!id)return;
+  if(pend===id){
+    pend=null;
+    const {error}=await sb.from("trades").delete().eq("id",id);
+    if(error){setSync("Could not delete: "+error.message,true);return}
+    trades=trades.filter(t=>t.id!==id);render();return;
+  }
+  pend=id;e.target.textContent="Tap again to delete";e.target.style.color="var(--neg)";
+  setTimeout(()=>{if(pend===id){pend=null;render()}},4000);
+});
+
+/* ---------- Import / Export ---------- */
+$("ex").addEventListener("click",async()=>{
+  const t=$("bk");
+  t.value=JSON.stringify(trades.map(({id,created,...rest})=>rest));
+  t.focus();t.select();
+  let ok=false;try{await navigator.clipboard.writeText(t.value);ok=true}catch(e){}
+  $("bkmsg").textContent=trades.length?(ok?`Copied ${trades.length} trades.`:`Select and copy the text above (${trades.length} trades).`):"Nothing to export yet.";
+});
+$("im").addEventListener("click",async()=>{
+  const m=$("bkmsg");
+  try{
+    const a=JSON.parse($("bk").value);
+    if(!Array.isArray(a))throw 0;
+    const rows=[];
+    a.forEach(t=>{
+      if(t&&t.date&&t.sym&&isFinite(t.size)&&isFinite(t.entry)&&isFinite(t.exit)){
+        const tr={side:t.side==="Short"?"Short":"Long",size:+t.size,entry:+t.entry,exit:+t.exit,fees:+t.fees||0};
+        rows.push({trade_date:String(t.date),symbol:String(t.sym),direction:tr.side,size:tr.size,entry_price:tr.entry,exit_price:tr.exit,fees:tr.fees,setup:String(t.setup||""),notes:String(t.notes||""),pnl:pnl(tr)});
+      }
+    });
+    if(!rows.length){m.textContent="No valid trades found in that text.";return}
+    m.textContent="Importing…";
+    const {error}=await sb.from("trades").insert(rows);
+    if(error){m.textContent="Import failed: "+error.message;return}
+    await loadTrades();
+    m.textContent=`Imported ${rows.length} trade${rows.length===1?"":"s"}.`;
+  }catch(e){m.textContent="That doesn’t look like valid backup text."}
+});
+</script>
+</body>
+</html>
