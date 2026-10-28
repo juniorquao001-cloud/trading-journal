@@ -23,6 +23,15 @@ input,select,textarea{font:inherit;padding:10px;border-radius:10px;border:1px so
 button{font:inherit;border:0;border-radius:10px;padding:12px;background:var(--accent);color:#fff;font-weight:600;cursor:pointer}
 button.ghost{background:transparent;color:var(--muted);padding:4px 8px;font-weight:400}
 button.outline{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+button.google{background:var(--bg);color:var(--text);border:1px solid var(--line)}
+.divider{color:var(--muted);font-size:12px;text-align:center}
+.pw{position:relative;display:block}
+.pw input{padding-right:44px}
+.eye{position:absolute;right:2px;top:50%;transform:translateY(-50%);background:transparent;color:var(--muted);padding:8px;display:flex;align-items:center;justify-content:center;border-radius:8px}
+.eye svg{width:20px;height:20px;display:block}
+.eye .slash{display:none}
+.eye.on .slash{display:block}
+.eye:focus-visible{outline:2px solid var(--accent)}
 .trade{display:flex;justify-content:space-between;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
 .trade:first-child{border-top:0}
 .trade .meta{color:var(--muted);font-size:12px}
@@ -42,6 +51,7 @@ h3{font-size:13px;color:var(--muted);margin:16px 0 4px}
 .msg{font-size:13px;margin-top:10px;min-height:18px}
 .auth{max-width:380px;margin:8vh auto 0}
 .auth form{grid-template-columns:1fr}
+.gwrap{display:grid;gap:10px}
 .hidden{display:none}
 </style>
 </head>
@@ -56,9 +66,16 @@ h3{font-size:13px;color:var(--muted);margin:16px 0 4px}
 <h2>Log in or create an account</h2>
 <form id="authForm">
 <label>Email<input id="email" type="email" autocomplete="email" required></label>
-<label>Password (at least 6 characters)<input id="password" type="password" autocomplete="current-password" minlength="6" required></label>
+<label>Password (at least 8 characters)
+<span class="pw"><input id="password" type="password" autocomplete="current-password" required>
+<button type="button" class="eye" data-target="password" aria-label="Show password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/><line class="slash" x1="3" y1="21" x2="21" y2="3"/></svg></button></span>
+</label>
 <button type="submit" id="loginBtn">Log in</button>
 <button type="button" class="outline" id="signupBtn">Create account</button>
+<div id="googleWrap" class="gwrap hidden">
+<div class="divider">or</div>
+<button type="button" class="google" id="googleBtn">Continue with Google</button>
+</div>
 <button type="button" class="ghost" id="forgotBtn">Forgot password?</button>
 </form>
 <div class="msg" id="authMsg"></div>
@@ -73,7 +90,10 @@ h3{font-size:13px;color:var(--muted);margin:16px 0 4px}
 <div class="card">
 <h2>Choose a new password</h2>
 <form id="resetForm">
-<label>New password (at least 6 characters)<input id="newpass" type="password" autocomplete="new-password" minlength="6" required></label>
+<label>New password (at least 8 characters)
+<span class="pw"><input id="newpass" type="password" autocomplete="new-password" minlength="8" required>
+<button type="button" class="eye" data-target="newpass" aria-label="Show password"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12z"/><circle cx="12" cy="12" r="3"/><line class="slash" x1="3" y1="21" x2="21" y2="3"/></svg></button></span>
+</label>
 <button type="submit">Save new password</button>
 </form>
 <div class="msg" id="resetMsg"></div>
@@ -134,6 +154,21 @@ const $=id=>document.getElementById(id);
 let trades=[];
 let currentUser=null;
 
+/* Change this to true only after Google login is set up in Supabase */
+const GOOGLE_LOGIN=false;
+const MIN_PASSWORD=8;
+
+/* ---------- Show / hide password ---------- */
+document.querySelectorAll(".eye").forEach(btn=>{
+  btn.addEventListener("click",()=>{
+    const input=$(btn.dataset.target);
+    const showing=input.type==="text";
+    input.type=showing?"password":"text";
+    btn.classList.toggle("on",!showing);
+    btn.setAttribute("aria-label",showing?"Show password":"Hide password");
+  });
+});
+
 /* ---------- Auth ---------- */
 let recovering=false;
 function show(view){
@@ -141,6 +176,12 @@ function show(view){
   $("appView").classList.toggle("hidden",view!=="app");
   $("resetView").classList.toggle("hidden",view!=="reset");
 }
+if(GOOGLE_LOGIN)$("googleWrap").classList.remove("hidden");
+$("googleBtn").addEventListener("click",async()=>{
+  authMsg("Opening Google…");
+  const {error}=await sb.auth.signInWithOAuth({provider:"google",options:{redirectTo:location.origin+location.pathname}});
+  if(error)authMsg(error.message,true);
+});
 $("forgotBtn").addEventListener("click",async()=>{
   const email=$("email").value.trim();
   if(!email){authMsg("Type your email above first, then tap Forgot password.",true);return}
@@ -168,7 +209,7 @@ $("authForm").addEventListener("submit",async e=>{
 });
 $("signupBtn").addEventListener("click",async()=>{
   const email=$("email").value.trim(),password=$("password").value;
-  if(!email||password.length<6){authMsg("Enter your email and a password of at least 6 characters.",true);return}
+  if(!email||password.length<MIN_PASSWORD){authMsg("Enter your email and a password of at least "+MIN_PASSWORD+" characters.",true);return}
   authMsg("Creating account…");
   const {data,error}=await sb.auth.signUp({email,password});
   if(error){authMsg(error.message,true);return}
@@ -232,7 +273,7 @@ function render(){
   <div class="stat"><small>Best trade</small><b class="${cls(best)}">${fmt(best)}</b></div>
   <div class="stat"><small>Worst trade</small><b class="${cls(worst)}">${fmt(worst)}</b></div>`;
   const sorted=[...trades].sort((a,b)=>b.date.localeCompare(a.date)||b.created-a.created);
-  $("list").innerHTML=sorted.length?sorted.map(t=>{const x=pnl(t);return `<div class="trade"><div><b>${esc(t.sym)}</b> · ${t.side}<div class="meta">${t.date} · ${t.size} @ ${t.entry} → ${t.exit}${t.setup?" · "+esc(t.setup):""}</div>${t.notes?`<div class="note">${esc(t.notes)}</div>`:""}</div><div class="right"><b class="${cls(x)}">${fmt(x)}</b><br><button class="ghost" data-id="${t.id}">Delete</button></div></div>`}).join(""):'<div class="empty">No trades yet. Log your first one above.</div>';
+  $("list").innerHTML=sorted.length?sorted.map(t=>{const x=pnl(t);return `<div class="trade"><div><b>${esc(t.sym)}</b> · ${esc(t.side)}<div class="meta">${esc(t.date)} · ${t.size} @ ${t.entry} → ${t.exit}${t.setup?" · "+esc(t.setup):""}</div>${t.notes?`<div class="note">${esc(t.notes)}</div>`:""}</div><div class="right"><b class="${cls(x)}">${fmt(x)}</b><br><button class="ghost" data-id="${esc(t.id)}">Delete</button></div></div>`}).join(""):'<div class="empty">No trades yet. Log your first one above.</div>';
   analysis();
 }
 
